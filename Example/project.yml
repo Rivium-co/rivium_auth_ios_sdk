@@ -1,0 +1,28 @@
+name: RiviumAuthExample
+options:
+  bundleIdPrefix: co.rivium.auth
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  RiviumAuth:
+    path: ../
+targets:
+  RiviumAuthExample:
+    type: application
+    platform: iOS
+    sources:
+      - RiviumAuthExample
+    info:
+      path: RiviumAuthExample/Info.plist
+    dependencies:
+      - package: RiviumAuth
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.rivium.auth.example
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        SUPPORTED_PLATFORMS: "iphonesimulator iphoneos"
+        SUPPORTS_MACCATALYST: "NO"
+        SDKROOT: iphoneos

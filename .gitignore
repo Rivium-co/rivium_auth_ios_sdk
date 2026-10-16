@@ -1,0 +1,28 @@
+# Swift/Xcode
+.build/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# SPM
+.swiftpm/
+Package.resolved
+
+# CocoaPods
+Pods/
+
+# Claude
+.claude/
+
+# macOS
+.DS_Store
+
+# Example build artifacts
+Example/build/
+Example/.build/
+Example/.swiftpm/
+Example/DerivedData/
+Example/*.xcuserstate
+Example/RiviumAuthExample.xcodeproj/xcuserdata/
+Example/RiviumAuthExample.xcodeproj/project.xcworkspace/xcuserdata/
