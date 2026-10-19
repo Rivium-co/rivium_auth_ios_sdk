@@ -38,6 +38,7 @@ final class HTTPClient {
         request.httpMethod = method
         request.timeoutInterval = 30
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(riviumAuthSDKHeader, forHTTPHeaderField: "X-Rivium-SDK")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let bearer = bearer {
             request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")

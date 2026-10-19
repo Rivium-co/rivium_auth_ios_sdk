@@ -339,4 +339,30 @@ final class RiviumAuthTests: XCTestCase {
         XCTAssertEqual(RiviumAuth.token(in: URL(string: "myapp://auth?token=abc123&x=1")!), "abc123")
         XCTAssertNil(RiviumAuth.token(in: URL(string: "myapp://auth")!))
     }
+
+    // MARK: - SDK header
+
+    func testEveryRequestSendsSDKHeader() async throws {
+        StubURLProtocol.reset { r in
+            r.path == "/v1/anonymous" ? .json(200, sessionBody(access: "acc-1", refresh: "ref-1", user: "u-anon")) : .empty(204)
+        }
+        make()
+        try await auth.signInAnonymously()
+        await auth.signOut()
+
+        XCTAssertGreaterThanOrEqual(StubURLProtocol.requests.count, 2)
+        for r in StubURLProtocol.requests {
+            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.1.1", r.path)
+        }
+    }
+
+    func testVersionMatchesPodspec() throws {
+        let podspec = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("RiviumAuth.podspec")
+        let text = try String(contentsOf: podspec, encoding: .utf8)
+        XCTAssertTrue(text.contains("s.version          = '\(riviumAuthSDKVersion)'"))
+        XCTAssertTrue(text.contains(":tag => '\(riviumAuthSDKVersion)'"))
+        XCTAssertEqual(riviumAuthSDKHeader, "auth-ios/\(riviumAuthSDKVersion)")
+    }
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Sends `X-Rivium-SDK: auth-ios/0.1.1` with every request so Rivium can show
+  which SDK versions are in use. No behaviour change.
+
 ## 0.1.0
 
 - First release.
