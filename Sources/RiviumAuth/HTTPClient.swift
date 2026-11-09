@@ -5,6 +5,14 @@ final class HTTPClient {
     let baseURL: URL
     let apiKey: String
     private let session: URLSession
+    private let localeLock = NSLock()
+    private var _locale: String?
+
+    /// Sent as `x-rivium-locale` (the language of the e-mails Rivium sends); nil = not sent.
+    var locale: String? {
+        get { localeLock.lock(); defer { localeLock.unlock() }; return _locale }
+        set { localeLock.lock(); _locale = newValue; localeLock.unlock() }
+    }
 
     init(baseURL: URL, apiKey: String, session: URLSession) {
         self.baseURL = baseURL
@@ -40,6 +48,9 @@ final class HTTPClient {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(riviumAuthSDKHeader, forHTTPHeaderField: "X-Rivium-SDK")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let locale = locale {
+            request.setValue(locale, forHTTPHeaderField: "x-rivium-locale")
+        }
         if let bearer = bearer {
             request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }

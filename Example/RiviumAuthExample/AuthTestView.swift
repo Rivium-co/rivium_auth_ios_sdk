@@ -1,7 +1,7 @@
 import SwiftUI
 import RiviumAuth
 
-// Rivium Auth — iOS example (SDK 0.1.1)
+// Rivium Auth — iOS example (SDK 0.4.0)
 //
 // Paste your public project key (Rivium Console → your project → API keys) into the field,
 // or replace the placeholder below. Never put a server secret in an app.
@@ -11,7 +11,10 @@ private let apiKeyPlaceholder = "rv_live_YOUR_PUBLIC_KEY"
 
 @MainActor
 final class AuthModel: ObservableObject {
-    @Published var apiKey = apiKeyPlaceholder
+    // Optional launch values (Xcode scheme → Arguments → Environment): RIVIUM_AUTH_API_KEY and RIVIUM_AUTH_URL.
+    @Published var apiKey = ProcessInfo.processInfo.environment["RIVIUM_AUTH_API_KEY"] ?? apiKeyPlaceholder
+    // Optional: another Auth server, for example one you run yourself. Empty = the default server.
+    @Published var serverURL = ProcessInfo.processInfo.environment["RIVIUM_AUTH_URL"] ?? ""
     @Published var email = ""
     @Published var password = ""
     @Published private(set) var userId: String?
@@ -29,7 +32,15 @@ final class AuthModel: ObservableObject {
             return
         }
         listener?.remove()
-        auth.configure(apiKey: key)
+        let server = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if server.isEmpty {
+            auth.configure(apiKey: key)
+        } else if let url = URL(string: server) {
+            auth.configure(apiKey: key, baseURL: url)
+        } else {
+            status = "The server URL is not valid."
+            return
+        }
         // Called on sign-in, sign-out and when a session ends.
         listener = auth.addAuthStateListener { [weak self] userId in
             Task { @MainActor in self?.userId = userId }
@@ -55,6 +66,23 @@ final class AuthModel: ObservableObject {
         let email = email.trimmingCharacters(in: .whitespaces), password = password
         run { _ = try await $0.signIn(email: email, password: password); return "Signed in with e-mail." }
     }
+
+    #if os(iOS)
+    /// Rivium's ready-made sign-in screen: only the methods turned on in the Console.
+    func openSignInScreen() {
+        Task {
+            let options = RiviumSignInOptions(
+                appName: "Rivium Auth example",
+                allowGuest: true,
+                openURL: { await UIApplication.shared.open($0) }
+            )
+            if let result = await RiviumSignIn.present(auth: auth, options: options) {
+                status = "Signed in with the sign-in screen."
+                userId = result.userId
+            }
+        }
+    }
+    #endif
 
     func signOut() {
         run { await $0.signOut(); return "Signed out." }
@@ -91,6 +119,8 @@ struct AuthTestView: View {
                 Section("Project") {
                     TextField("Public API key (rv_live_...)", text: $model.apiKey)
                         .plainInput()
+                    TextField("Server URL (optional)", text: $model.serverURL)
+                        .plainInput()
                     Button("Configure", action: model.configure)
                 }
 
@@ -102,6 +132,13 @@ struct AuthTestView: View {
                         Text(model.status).foregroundStyle(.secondary)
                     }
                 }
+
+                #if os(iOS)
+                Section("Ready-made sign-in screen") {
+                    Button("Open the ready-made sign-in screen", action: model.openSignInScreen)
+                        .disabled(!model.isConfigured)
+                }
+                #endif
 
                 Section("Anonymous") {
                     Button("Sign in anonymously", action: model.signInAnonymously)

@@ -352,7 +352,7 @@ final class RiviumAuthTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(StubURLProtocol.requests.count, 2)
         for r in StubURLProtocol.requests {
-            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.2.0", r.path)
+            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.4.0", r.path)
         }
     }
 
@@ -364,5 +364,39 @@ final class RiviumAuthTests: XCTestCase {
         XCTAssertTrue(text.contains("s.version          = '\(riviumAuthSDKVersion)'"))
         XCTAssertTrue(text.contains(":tag => '\(riviumAuthSDKVersion)'"))
         XCTAssertEqual(riviumAuthSDKHeader, "auth-ios/\(riviumAuthSDKVersion)")
+    }
+
+    // MARK: - E-mail language
+
+    func testLanguageCodeIsSentAsLocaleHeaderOnlyWhenSet() async throws {
+        StubURLProtocol.reset { _ in .empty(202) }
+        make()
+        try await auth.sendMagicLink(email: "a@example.com", redirectURL: "https://app.example.com/magic")
+        auth.languageCode = "de"
+        try await auth.sendMagicLink(email: "a@example.com", redirectURL: "https://app.example.com/magic")
+        auth.languageCode = nil
+        try await auth.sendMagicLink(email: "a@example.com", redirectURL: "https://app.example.com/magic")
+        let sent = StubURLProtocol.requests(to: "/v1/magic-link/send").map { $0.headers["x-rivium-locale"] }
+        XCTAssertEqual(sent, [nil, "de", nil])
+    }
+
+    func testLanguageCodeSetBeforeConfigureIsKeptAndBadValuesAreIgnored() async throws {
+        StubURLProtocol.reset { _ in .empty(202) }
+        storage = MemorySessionStorage(nil)
+        auth = RiviumAuth()
+        auth.languageCode = "de-AT"
+        auth.configure(apiKey: "rv_live_test", baseURL: base, urlSession: StubURLProtocol.session(), storage: storage)
+        try await auth.sendMagicLink(email: "a@example.com", redirectURL: "https://app.example.com/magic")
+        XCTAssertEqual(StubURLProtocol.requests(to: "/v1/magic-link/send").first?.headers["x-rivium-locale"], "de-AT")
+        for bad in ["", "x", "de\r\nX: y", String(repeating: "x", count: 40), "12"] {
+            auth.languageCode = bad
+            XCTAssertNil(auth.languageCode, bad)
+        }
+    }
+
+    func testUseAppLanguageSetsALanguageTag() {
+        make()
+        auth.useAppLanguage()
+        XCTAssertNotNil(auth.languageCode)
     }
 }

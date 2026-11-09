@@ -38,12 +38,8 @@ public struct RiviumTokenResult {
         let amr = (payload["amr"] as? [Any])?.first as? String
         let authTime = (payload["auth_time"] as? NSNumber)?.doubleValue ?? iat
         payload.removeValue(forKey: "meta") // Rivium's own bookkeeping for its servers, not a claim
-        // Custom claims come at the top level; a server that nests them under `claims` gets them spread out too
-        // (token fields always win over a custom claim).
-        var claims = (payload.removeValue(forKey: "claims") as? [String: Any]) ?? [:]
-        claims.merge(payload) { _, field in field }
         self.token = token
-        self.claims = claims
+        self.claims = payload
         self.expirationDate = Date(timeIntervalSince1970: exp)
         self.issuedAtDate = Date(timeIntervalSince1970: iat)
         self.authDate = Date(timeIntervalSince1970: authTime)

@@ -23,11 +23,11 @@ final class TokenResultTests: XCTestCase {
         var p = standard()
         p["plan"] = "pro"
         p["team"] = ["id": "t1", "tags": ["red"]]
-        p["نقش"] = "مدیر 👋"
+        p["役割"] = "管理者 👋"
         let r = RiviumTokenResult(token: jwt(p))!
         XCTAssertEqual(r.claims["plan"] as? String, "pro")
         XCTAssertEqual((r.claims["team"] as? [String: Any])?["id"] as? String, "t1")
-        XCTAssertEqual(r.claims["نقش"] as? String, "مدیر 👋")
+        XCTAssertEqual(r.claims["役割"] as? String, "管理者 👋")
         XCTAssertEqual(r.claims["sub"] as? String, "ru_user1")
         XCTAssertNil(r.claims["meta"])
         XCTAssertEqual(r.expirationDate, Date(timeIntervalSince1970: TimeInterval(now + 3600)))
@@ -64,16 +64,5 @@ final class TokenResultTests: XCTestCase {
         XCTAssertEqual(cached?.claims["plan"] as? String, "free", "the same token until it is refreshed")
         let fresh = try await auth.getTokenResult(forceRefresh: true)
         XCTAssertEqual(fresh?.claims["plan"] as? String, "pro")
-    }
-
-    func testNestedCustomClaimsFromTheRiviumServerComeOutByNameAndTokenFieldsWin() {
-        var p = standard()
-        p.removeValue(forKey: "auth_time")
-        p["claims"] = ["levels": ["A1"], "sub": "someone-else"]
-        let r = RiviumTokenResult(token: jwt(p))!
-        XCTAssertEqual(r.claims["levels"] as? [String], ["A1"])
-        XCTAssertEqual(r.claims["sub"] as? String, "ru_user1")
-        XCTAssertNil(r.claims["claims"])
-        XCTAssertEqual(r.authDate, r.issuedAtDate)
     }
 }

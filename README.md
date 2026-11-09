@@ -24,28 +24,23 @@
 
 ### Swift Package Manager (SPM)
 
-The SDK is published on [Rivium Center](https://center.rivium.co). Add to your `Package.swift`:
+Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://center.rivium.co/rivium/rivium-auth-ios-sdk.git", from: "0.2.0"),
+    .package(url: "https://github.com/Rivium-co/rivium_auth_ios_sdk.git", from: "0.1.1"),
 ]
 ```
 
 Then add `"RiviumAuth"` to your target's dependencies. Or in Xcode: **File > Add Package Dependencies** and enter:
 
 ```
-https://center.rivium.co/rivium/rivium-auth-ios-sdk.git
+https://github.com/Rivium-co/rivium_auth_ios_sdk.git
 ```
 
 ### CocoaPods
 
-Add Rivium Center's spec repository at the top of your `Podfile` (the second `source` line keeps public pods working), then the pod:
-
 ```ruby
-source 'https://center.rivium.co/rivium/specs.git'
-source 'https://cdn.cocoapods.org/'
-
 pod 'RiviumAuth', '~> 0.1'
 ```
 

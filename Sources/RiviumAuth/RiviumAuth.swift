@@ -38,8 +38,34 @@ public final class RiviumAuth {
     private var userId: String?
     private var cachedUser: RiviumUser?
     private var listeners: [UUID: (String?) -> Void] = [:]
+    private var language: String?
 
     init() {}
+
+    // MARK: - Language
+
+    /// The language of the e-mails Rivium sends this user (confirm e-mail, password reset, magic link), like
+    /// Firebase's `languageCode`: a BCP 47 tag such as `de` or `en-US`. nil = the project's template language
+    /// (Console › Rivium Auth › Email templates). A language Rivium has no texts for also falls back to it.
+    public var languageCode: String? {
+        get {
+            lock.lock(); defer { lock.unlock() }
+            return language
+        }
+        set {
+            let v = newValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let ok = (2...35).contains(v.count) && v.range(of: "^[A-Za-z]{2,8}([-_][A-Za-z0-9]{1,8})*$", options: .regularExpression) != nil
+            lock.lock()
+            language = ok ? v : nil
+            http?.locale = language
+            lock.unlock()
+        }
+    }
+
+    /// Sets `languageCode` to the app's current language, like Firebase's `useAppLanguage()`.
+    public func useAppLanguage() {
+        languageCode = Bundle.main.preferredLocalizations.first ?? Locale.preferredLanguages.first
+    }
 
     // MARK: - Setup
 
@@ -70,11 +96,18 @@ public final class RiviumAuth {
             self?.userChanged(user)
         }
         lock.lock()
+        http.locale = language
         self.http = http
         self.session = manager
         self.userId = manager.restoredUserId
         self.cachedUser = nil
         lock.unlock()
+    }
+
+    /// The Rivium Auth server this client talks to.
+    public var baseURL: URL {
+        lock.lock(); defer { lock.unlock() }
+        return http?.baseURL ?? Self.defaultBaseURL
     }
 
     // MARK: - State
@@ -232,8 +265,12 @@ public final class RiviumAuth {
     }
 
     /// Sends a password-reset link. Succeeds whether or not the address has an account.
-    public func sendPasswordReset(email: String, redirectURL: String) async throws {
-        try await client().send("POST", "v1/password/forgot", body: ["email": email, "redirectUrl": redirectURL])
+    /// - Parameter redirectURL: Where the link opens; one of the project's allowed redirect URLs. nil: Rivium's own
+    ///   reset page.
+    public func sendPasswordReset(email: String, redirectURL: String? = nil) async throws {
+        var body = ["email": email]
+        body["redirectUrl"] = redirectURL
+        try await client().send("POST", "v1/password/forgot", body: body)
     }
 
     /// Sets a new password with the token from the reset link. Every session of
