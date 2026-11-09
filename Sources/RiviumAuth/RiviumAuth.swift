@@ -129,6 +129,17 @@ public final class RiviumAuth {
         try await sessionManager().validAccessToken(forceRefresh: forceRefresh)
     }
 
+    /// The access token with its decoded fields, like Firebase's
+    /// `getIDTokenResult()`: `claims` holds the custom claims your server set
+    /// (`setCustomUserClaims`), for example to show a "Pro" badge. Nil when
+    /// nobody is signed in. Pass `forceRefresh: true` right after your server
+    /// changed the claims, to get them without waiting for the next refresh
+    /// (at most an hour). For display only: access is decided on the server.
+    public func getTokenResult(forceRefresh: Bool = false) async throws -> RiviumTokenResult? {
+        guard let token = try await getAccessToken(forceRefresh: forceRefresh) else { return nil }
+        return RiviumTokenResult(token: token)
+    }
+
     /// Pass this to Rivium Sync and Rivium Push: `sync.userTokens.provider = RiviumAuth.shared.tokenProvider`.
     public var tokenProvider: RiviumAuthTokenProvider {
         { [unowned self] in try await self.getAccessToken() }

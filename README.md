@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://rivium.co">
-    <img src="https://rivium.co/logo.png" alt="Rivium" width="120" />
+    <img src="https://rivium.co/icon.svg" alt="Rivium" width="120" />
   </a>
 </p>
 
@@ -15,7 +15,6 @@
   <img src="https://img.shields.io/badge/iOS-13.0+-000000?logo=apple&logoColor=white" alt="iOS 13+" />
   <img src="https://img.shields.io/badge/macOS-12.0+-000000?logo=apple&logoColor=white" alt="macOS 12+" />
   <img src="https://img.shields.io/badge/SPM-compatible-orange" alt="SPM Compatible" />
-  <a href="https://cocoapods.org/pods/RiviumAuth"><img src="https://img.shields.io/cocoapods/v/RiviumAuth.svg" alt="CocoaPods" /></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
 </p>
 
@@ -25,23 +24,28 @@
 
 ### Swift Package Manager (SPM)
 
-Add to your `Package.swift`:
+The SDK is published on [Rivium Center](https://center.rivium.co). Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Rivium-co/rivium_auth_ios_sdk.git", from: "0.1.1"),
+    .package(url: "https://center.rivium.co/rivium/rivium-auth-ios-sdk.git", from: "0.2.0"),
 ]
 ```
 
 Then add `"RiviumAuth"` to your target's dependencies. Or in Xcode: **File > Add Package Dependencies** and enter:
 
 ```
-https://github.com/Rivium-co/rivium_auth_ios_sdk.git
+https://center.rivium.co/rivium/rivium-auth-ios-sdk.git
 ```
 
 ### CocoaPods
 
+Add Rivium Center's spec repository at the top of your `Podfile` (the second `source` line keeps public pods working), then the pod:
+
 ```ruby
+source 'https://center.rivium.co/rivium/specs.git'
+source 'https://cdn.cocoapods.org/'
+
 pod 'RiviumAuth', '~> 0.1'
 ```
 
@@ -176,6 +180,21 @@ try await auth.deleteAccount()      // required by the App Store for apps with s
 The refresh token is stored in the Keychain on this device only; the access
 token stays in memory. A session revoked elsewhere signs the user out here; a
 network error does not.
+
+## Custom claims
+
+Your server sets custom claims for a user with the server secret (`setCustomUserClaims`, see
+[Custom claims](https://rivium.co/docs/auth/custom-claims)), for example `{ "plan": "pro" }`. Every token of the
+user carries them, and Rivium Sync rules read them as `auth.token.plan`. In the app, read them to show things
+(a "Pro" badge): access is still decided on the server.
+
+```swift
+let result = try await auth.getTokenResult()
+if result?.claims["plan"] as? String == "pro" { showProBadge() }
+
+// Right after your server changed the claims ("Check my purchase"):
+_ = try await auth.getTokenResult(forceRefresh: true)
+```
 
 ## Errors
 

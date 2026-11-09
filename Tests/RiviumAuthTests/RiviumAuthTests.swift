@@ -352,7 +352,7 @@ final class RiviumAuthTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(StubURLProtocol.requests.count, 2)
         for r in StubURLProtocol.requests {
-            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.1.1", r.path)
+            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.2.0", r.path)
         }
     }
 

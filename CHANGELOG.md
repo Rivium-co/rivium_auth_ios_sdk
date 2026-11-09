@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- `getTokenResult(forceRefresh:)`: the access token with its decoded fields, like Firebase's `AuthTokenResult`.
+  `claims` holds the custom claims your server set with `setCustomUserClaims` (for example `plan`, `role`), plus
+  `sub`, `iat`, `exp`, `auth_time` and `amr`; also `expirationDate`, `issuedAtDate`, `authDate` and `signInProvider`.
+  For showing things in the app; access is still decided on the server. Pass `forceRefresh: true` right after your
+  server changed the claims.
+
 ## 0.1.1
 
 - Sends `X-Rivium-SDK: auth-ios/0.1.1` with every request so Rivium can show
