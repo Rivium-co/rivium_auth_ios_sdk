@@ -241,12 +241,19 @@ public final class RiviumAuth {
     // MARK: - E-mail and password
 
     /// Creates an account. When the project requires a verified e-mail the
-    /// user is not signed in until they follow the link (`signedIn == false`).
-    /// - Parameter redirectURL: Where the verification link opens; one of the
-    ///   project's allowed redirect URLs.
-    public func signUp(email: String, password: String, redirectURL: String? = nil) async throws -> SignUpResult {
+    /// user is not signed in until they follow the link (`signedIn == false`),
+    /// and the confirmation e-mail is always sent (to Rivium's own page when
+    /// there is no `redirectURL`).
+    /// - Parameters:
+    ///   - redirectURL: Where the verification link opens; one of the
+    ///     project's link addresses.
+    ///   - continueURL: Where the "Continue" button of Rivium's own confirm page
+    ///     takes the user afterwards (Firebase's continue URL); one of the
+    ///     project's link addresses. Not used when `redirectURL` is your own page.
+    public func signUp(email: String, password: String, redirectURL: String? = nil, continueURL: String? = nil) async throws -> SignUpResult {
         var body = ["email": email, "password": password]
         body["redirectUrl"] = redirectURL
+        body["continueUrl"] = continueURL
         let response = try await client().send("POST", "v1/password/sign-up", body: body, as: SignUpResponse.self)
         if let session = response.session { try await start(session) }
         return SignUpResult(userId: response.userId, verificationSent: response.verificationSent ?? false, signedIn: response.session != nil)
@@ -265,11 +272,14 @@ public final class RiviumAuth {
     }
 
     /// Sends a password-reset link. Succeeds whether or not the address has an account.
-    /// - Parameter redirectURL: Where the link opens; one of the project's allowed redirect URLs. nil: Rivium's own
-    ///   reset page.
-    public func sendPasswordReset(email: String, redirectURL: String? = nil) async throws {
+    /// - Parameters:
+    ///   - redirectURL: Where the link opens; one of the project's link addresses. nil: Rivium's own reset page.
+    ///   - continueURL: Where the "Continue" button of Rivium's reset page takes the user after saving the new
+    ///     password; one of the project's link addresses. Not used when `redirectURL` is your own page.
+    public func sendPasswordReset(email: String, redirectURL: String? = nil, continueURL: String? = nil) async throws {
         var body = ["email": email]
         body["redirectUrl"] = redirectURL
+        body["continueUrl"] = continueURL
         try await client().send("POST", "v1/password/forgot", body: body)
     }
 
@@ -285,10 +295,32 @@ public final class RiviumAuth {
     }
 
     /// Sends the signed-in user a new verification link.
-    public func sendEmailVerification(redirectURL: String) async throws {
+    /// - Parameters:
+    ///   - redirectURL: Where the link opens; one of the project's link addresses. nil: Rivium's own confirm page.
+    ///   - continueURL: Where the "Continue" button of Rivium's confirm page takes the user afterwards; one of the
+    ///     project's link addresses. Not used when `redirectURL` is your own page.
+    public func sendEmailVerification(redirectURL: String? = nil, continueURL: String? = nil) async throws {
+        var body: [String: String] = [:]
+        body["redirectUrl"] = redirectURL
+        body["continueUrl"] = continueURL
         try await authorized { http, token in
-            try await http.send("POST", "v1/email/send-verification", body: ["redirectUrl": redirectURL], bearer: token)
+            try await http.send("POST", "v1/email/send-verification", body: body, bearer: token)
         }
+    }
+
+    /// Sends the confirmation e-mail again to someone who can't sign in yet because the project requires a
+    /// verified e-mail (`signIn` failed with `.emailNotVerified`). The e-mail and password prove the account: a wrong
+    /// pair fails like signing in (`.invalidCredentials`). Nothing is sent to an account that is already confirmed.
+    /// Does not sign in and does not change who is signed in.
+    /// - Parameters:
+    ///   - redirectURL: Where the link opens; one of the project's link addresses. nil: Rivium's own confirm page.
+    ///   - continueURL: Where the "Continue" button of Rivium's confirm page takes the user afterwards; one of the
+    ///     project's link addresses. Not used when `redirectURL` is your own page.
+    public func resendVerification(email: String, password: String, redirectURL: String? = nil, continueURL: String? = nil) async throws {
+        var body = ["email": email, "password": password]
+        body["redirectUrl"] = redirectURL
+        body["continueUrl"] = continueURL
+        try await client().send("POST", "v1/email/resend-verification", body: body)
     }
 
     // MARK: - Magic link

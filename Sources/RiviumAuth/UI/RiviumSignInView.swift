@@ -107,6 +107,11 @@ private struct HomeScreen: View {
         VStack(spacing: 12) {
             Header(c: c, title: c.title)
             ErrorBanner(text: c.errorText)
+            if c.canResend {
+                Button(s["resend"]) { c.resendVerification() }
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("rivium-resend")
+            }
             if c.showPassword {
                 Field(label: s["email"], text: $c.email, error: c.emailError, kind: .email, id: "rivium-email", submit: .next)
                 Field(label: s["password"], text: $c.password, error: c.passwordError, kind: .password, id: "rivium-password", submit: .done) {
@@ -257,6 +262,7 @@ private struct MessageScreen: View {
                 switch c.sent {
                 case .reset: return "resetSent"
                 case .magicLink: return "linkSent"
+                case .resend: return "resendSent"
                 default: return "verifySent"
                 }
             }()

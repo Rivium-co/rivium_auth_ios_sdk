@@ -1,7 +1,7 @@
 import SwiftUI
 import RiviumAuth
 
-// Rivium Auth — iOS example (SDK 0.4.0)
+// Rivium Auth — iOS example (SDK 0.5.0)
 //
 // Paste your public project key (Rivium Console → your project → API keys) into the field,
 // or replace the placeholder below. Never put a server secret in an app.

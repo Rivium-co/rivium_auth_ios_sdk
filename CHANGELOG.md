@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0
+
+- `resendVerification(email:password:redirectURL:continueURL:)`: sends the confirmation e-mail again to someone who
+  can't sign in yet because the project requires a confirmed e-mail (`signIn` failed with `.emailNotVerified`). The
+  e-mail and password prove the account; a wrong pair fails like signing in (`.invalidCredentials`). It does not sign
+  in, and an account that is already confirmed gets no e-mail.
+- `continueURL` (optional) on `signUp`, `sendPasswordReset`, `sendEmailVerification` and `resendVerification`, like
+  Firebase's continue URL: Rivium's own confirm and reset pages then show a "Continue" button that takes the user
+  there. It must be one of the project's link addresses (Console › Rivium Auth › Settings).
+- `sendEmailVerification()`: `redirectURL` is optional; without it the link opens Rivium's own confirm page.
+- Projects that require a confirmed e-mail: `signUp` now always sends the confirmation e-mail, also without
+  `redirectURL` (the link then opens Rivium's own confirm page), so `verificationSent` is true.
+- Link addresses may be `http://localhost:<port>` or `http://127.0.0.1:<port>` while you develop.
+- Ready-made sign-in screen: when signing in fails because the e-mail is not confirmed, it shows "Send again", which
+  e-mails a new confirmation link and then says "We sent a new link to {email}." New option `continueURL`, used for
+  creating an account, forgot password and "Send again".
+
 ## 0.2.0
 
 - `getTokenResult(forceRefresh:)`: the access token with its decoded fields, like Firebase's `AuthTokenResult`.

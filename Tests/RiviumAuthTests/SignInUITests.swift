@@ -438,10 +438,118 @@ final class SignInUITests: XCTestCase {
         XCTAssertEqual(c.password, "")
     }
 
+    // MARK: - 0.5.0: "Send again" for an unconfirmed e-mail
+
+    private func unconfirmed(_ options: RiviumSignInOptions = RiviumSignInOptions(languageCode: "en")) async -> RiviumSignInController {
+        answers["/v1/password/sign-in"] = { _ in .json(403, ["code": "EMAIL_NOT_VERIFIED", "message": "Confirm the e-mail first"]) }
+        let (c, _) = await screen(["password"], options)
+        c.email = " ana@example.com "
+        c.password = "a-good-password"
+        XCTAssertFalse(c.canResend, "no Send again before sign-in failed")
+        await c.signIn()?.value
+        return c
+    }
+
+    func testEmailNotVerifiedOffersSendAgain() async {
+        let c = await unconfirmed()
+        XCTAssertEqual(c.error, "EMAIL_NOT_VERIFIED")
+        XCTAssertEqual(c.errorText, "Confirm your e-mail first. Check your inbox.")
+        XCTAssertTrue(c.canResend)
+        XCTAssertEqual(c.strings["resend"], "Send again")
+
+        answers["/v1/password/sign-in"] = { _ in .json(401, ["code": "INVALID_CREDENTIALS", "message": "no"]) }
+        await c.signIn()?.value
+        XCTAssertFalse(c.canResend, "only for EMAIL_NOT_VERIFIED")
+    }
+
+    func testSendAgainCallsTheEndpointWithTheTypedEmailAndPasswordThenSaysANewLinkWasSent() async {
+        let c = await unconfirmed(en { $0.continueURL = "https://myapp.example/done" })
+        var resent: [String: Any] = [:]
+        answers["/v1/email/resend-verification"] = { r in
+            resent = r.body
+            return .json(202, ["ok": true], delay: 0.2)
+        }
+        let task = c.resendVerification()
+        XCTAssertNotNil(task)
+        XCTAssertTrue(c.busy, "busy while sending")
+        XCTAssertNil(c.resendVerification(), "one send at a time")
+        await task?.value
+        XCTAssertFalse(c.busy)
+        XCTAssertEqual(resent as? [String: String], [
+            "email": "ana@example.com", "password": "a-good-password",
+            "redirectUrl": "https://auth.example.test/pages/verify", "continueUrl": "https://myapp.example/done",
+        ])
+        XCTAssertEqual(StubURLProtocol.requests(to: "/v1/email/resend-verification").count, 1)
+        XCTAssertNil(StubURLProtocol.requests(to: "/v1/email/resend-verification")[0].headers["Authorization"])
+        XCTAssertEqual(c.screen, .sent)
+        XCTAssertEqual(c.sent, .resend)
+        XCTAssertEqual(c.password, "", "the password is not kept")
+        XCTAssertNil(c.auth.currentUserId, "nobody is signed in")
+        XCTAssertEqual(c.strings["resendSent"].replacingOccurrences(of: "{email}", with: "ana@example.com"), "We sent a new link to ana@example.com.")
+    }
+
+    func testSendAgainUsesTheAppsConfirmURLAndNoContinueURLWhenNotSet() async {
+        let c = await unconfirmed(en { $0.verifyRedirectURL = "myapp://verify" })
+        answers["/v1/email/resend-verification"] = { _ in .json(202, ["ok": true]) }
+        await c.resendVerification()?.value
+        XCTAssertEqual(bodies("/v1/email/resend-verification").first as? [String: String], [
+            "email": "ana@example.com", "password": "a-good-password", "redirectUrl": "myapp://verify",
+        ])
+    }
+
+    func testSendAgainErrorsAreShownLikeOtherErrors() async {
+        let c = await unconfirmed()
+        answers["/v1/email/resend-verification"] = { _ in .json(429, ["code": "RATE_LIMITED", "message": "slow"]) }
+        await c.resendVerification()?.value
+        XCTAssertEqual(c.screen, .home)
+        XCTAssertEqual(c.error, "RATE_LIMITED")
+        XCTAssertEqual(c.errorText, "Too many tries. Wait a little and try again.")
+        XCTAssertFalse(c.busy)
+        XCTAssertNil(c.auth.currentUserId)
+
+        let d = await unconfirmed()
+        answers["/v1/email/resend-verification"] = { _ in .json(401, ["code": "INVALID_CREDENTIALS", "message": "no"]) }
+        await d.resendVerification()?.value
+        XCTAssertEqual(d.errorText, "Wrong e-mail or password.")
+    }
+
+    func testSendAgainNeedsTheTypedPasswordAndTheErrorFirst() async {
+        let (c, _) = await screen(["password"])
+        c.email = "ana@example.com"
+        c.password = "a-good-password"
+        XCTAssertNil(c.resendVerification(), "not offered before sign-in answered EMAIL_NOT_VERIFIED")
+        let d = await unconfirmed()
+        d.password = ""
+        XCTAssertFalse(d.canResend)
+        XCTAssertNil(d.resendVerification())
+        XCTAssertTrue(StubURLProtocol.requests(to: "/v1/email/resend-verification").isEmpty)
+    }
+
+    func testContinueURLGoesToSignUpAndForgotPassword() async {
+        answers["/v1/password/sign-up"] = { _ in .json(200, ["userId": "u9", "verificationSent": true, "session": NSNull()]) }
+        answers["/v1/password/forgot"] = { _ in .empty(202) }
+        let (c, _) = await screen(["password"], en { $0.continueURL = "https://myapp.example/done" })
+        c.go(.signUp)
+        c.email = "new@example.com"
+        c.password = "a-good-password"
+        await c.signUp()?.value
+        XCTAssertEqual(bodies("/v1/password/sign-up").first?["continueUrl"] as? String, "https://myapp.example/done")
+        c.go(.forgot)
+        await c.sendReset()?.value
+        XCTAssertEqual(bodies("/v1/password/forgot").first as? [String: String], ["email": "new@example.com", "continueUrl": "https://myapp.example/done"])
+
+        let (plain, _) = await screen(["password"])
+        plain.go(.signUp)
+        plain.email = "new2@example.com"
+        plain.password = "a-good-password"
+        await plain.signUp()?.value
+        XCTAssertNil(bodies("/v1/password/sign-up").last?["continueUrl"], "no continueUrl when not set")
+    }
+
     // MARK: - Texts
 
     func testTheTexts() {
-        XCTAssertEqual(RiviumSignInStrings.keys.count, 54)
+        XCTAssertEqual(RiviumSignInStrings.keys.count, 56)
         XCTAssertEqual(RiviumSignInStrings.of("de").error("NOPE"), "Something went wrong. Try again.")
         for code in ["de", "de-DE", "", "toString", "EN_us"] as [String] {
             XCTAssertEqual(RiviumSignInStrings.of(code).languageCode, "en", code)

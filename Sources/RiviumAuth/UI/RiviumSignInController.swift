@@ -13,6 +13,8 @@ public final class RiviumSignInController: ObservableObject {
     /// Which e-mail the "check your e-mail" screen is about.
     public enum SentKind: Equatable {
         case reset, magicLink, verify
+        /// "Send again": a new confirmation link for an account that can't sign in until it is confirmed.
+        case resend
     }
 
     public let auth: RiviumAuth
@@ -73,6 +75,10 @@ public final class RiviumSignInController: ObservableObject {
 
     /// Buttons under the e-mail form (or alone when there is no form).
     public var hasOtherMethods: Bool { showMagicLink || showTelegram || showGoogle || showApple || showGuest }
+
+    /// Sign-in failed because the e-mail is not confirmed yet: the screen offers "Send again" (`resendVerification()`)
+    /// with the e-mail and password just typed.
+    public var canResend: Bool { error == RiviumAuthError.Code.emailNotVerified.rawValue && !password.isEmpty && showPassword }
 
     /// The message for `error`, in the screen's language.
     public var errorText: String? { error.map(strings.error) }
@@ -180,8 +186,9 @@ public final class RiviumSignInController: ObservableObject {
         guard !busy, checkEmail(needPassword: true) else { return nil }
         let email = trimmedEmail, password = password
         let redirect = options.verifyRedirectURL ?? Self.page(auth.baseURL, "verify")
+        let next = options.continueURL
         return run { [auth] in
-            let r = try await auth.signUp(email: email, password: password, redirectURL: redirect)
+            let r = try await auth.signUp(email: email, password: password, redirectURL: redirect, continueURL: next)
             if r.signedIn { return self.done(AuthResult(userId: r.userId, isNewUser: nil)) }
             self.password = ""
             if !r.verificationSent {
@@ -201,9 +208,26 @@ public final class RiviumSignInController: ObservableObject {
         let email = trimmedEmail
         // No URL of the app's own: the server uses Rivium's reset page.
         let redirect = options.resetRedirectURL
+        let next = options.continueURL
         return run { [auth] in
-            try await auth.sendPasswordReset(email: email, redirectURL: redirect)
+            try await auth.sendPasswordReset(email: email, redirectURL: redirect, continueURL: next)
             self.sent = .reset
+            self.screen = .sent
+        }
+    }
+
+    /// "Send again" after sign-in answered that the e-mail is not confirmed: sends a new confirmation link, proven
+    /// with the e-mail and password the user typed. Signs nobody in.
+    @discardableResult
+    public func resendVerification() -> Task<Void, Never>? {
+        guard !busy, canResend, checkEmail(needPassword: true) else { return nil }
+        let email = trimmedEmail, password = password
+        let redirect = options.verifyRedirectURL ?? Self.page(auth.baseURL, "verify")
+        let next = options.continueURL
+        return run { [auth] in
+            try await auth.resendVerification(email: email, password: password, redirectURL: redirect, continueURL: next)
+            self.password = ""
+            self.sent = .resend
             self.screen = .sent
         }
     }

@@ -297,6 +297,83 @@ final class RiviumAuthTests: XCTestCase {
         XCTAssertNil(auth.currentUserId)
     }
 
+    // MARK: - 0.5.0: resend verification, continue URL
+
+    func testResendVerificationSendsTheEmailAndPasswordWithoutBearerAndSignsNobodyIn() async throws {
+        StubURLProtocol.reset { r in r.path == "/v1/email/resend-verification" ? .json(202, ["ok": true]) : .empty(500) }
+        make()
+        try await auth.resendVerification(email: "a@b.co", password: "long-password-1")
+        try await auth.resendVerification(email: "a@b.co", password: "long-password-1", redirectURL: "myapp://verify", continueURL: "https://myapp.example/done")
+        let sent = StubURLProtocol.requests(to: "/v1/email/resend-verification")
+        XCTAssertEqual(sent.map(\.method), ["POST", "POST"])
+        XCTAssertEqual(sent[0].body as? [String: String], ["email": "a@b.co", "password": "long-password-1"], "no redirectUrl or continueUrl when not given")
+        XCTAssertEqual(sent[1].body as? [String: String], [
+            "email": "a@b.co", "password": "long-password-1",
+            "redirectUrl": "myapp://verify", "continueUrl": "https://myapp.example/done",
+        ])
+        XCTAssertEqual(sent[0].headers["x-api-key"], "rv_live_test")
+        XCTAssertNil(sent[0].headers["Authorization"])
+        XCTAssertNil(auth.currentUserId)
+        XCTAssertNil(storage.load())
+    }
+
+    func testResendVerificationErrorsKeepTheServerCodeAndTheSignedInUser() async throws {
+        var reply: StubURLProtocol.Reply = .json(401, ["code": "INVALID_CREDENTIALS", "message": "Wrong e-mail or password"])
+        StubURLProtocol.reset { _ in reply }
+        make(restored: StoredSession(refreshToken: "ref-1", userId: "u-1"))
+        do {
+            try await auth.resendVerification(email: "a@b.co", password: "wrong")
+            XCTFail("expected an error")
+        } catch let error as RiviumAuthError {
+            XCTAssertEqual(error.code, .invalidCredentials)
+            XCTAssertEqual(error.httpStatus, 401)
+        }
+        XCTAssertEqual(auth.currentUserId, "u-1", "a failed resend does not sign anyone out")
+        XCTAssertEqual(storage.load(), StoredSession(refreshToken: "ref-1", userId: "u-1"))
+
+        reply = .json(429, ["code": "RATE_LIMITED", "message": "slow down"])
+        do {
+            try await auth.resendVerification(email: "a@b.co", password: "long-password-1")
+            XCTFail("expected an error")
+        } catch let error as RiviumAuthError {
+            XCTAssertEqual(error.code, .rateLimited)
+        }
+        XCTAssertEqual(auth.currentUserId, "u-1")
+    }
+
+    func testContinueURLIsSentOnlyWhenGiven() async throws {
+        StubURLProtocol.reset { r in
+            switch r.path {
+            case "/v1/password/sign-up": return .json(200, ["userId": "u-9", "verificationSent": true, "session": NSNull()])
+            case "/v1/token/refresh": return .json(200, sessionBody(access: "acc-2", refresh: "ref-2", user: "u-1"))
+            default: return .json(202, ["ok": true])
+            }
+        }
+        make(restored: StoredSession(refreshToken: "ref-1", userId: "u-1"))
+
+        _ = try await auth.signUp(email: "a@b.co", password: "long-password-1")
+        _ = try await auth.signUp(email: "a@b.co", password: "long-password-1", continueURL: "https://myapp.example/done")
+        XCTAssertEqual(StubURLProtocol.requests(to: "/v1/password/sign-up").map { $0.body["continueUrl"] as? String }, [nil, "https://myapp.example/done"])
+        XCTAssertEqual(StubURLProtocol.requests(to: "/v1/password/sign-up")[0].body as? [String: String], ["email": "a@b.co", "password": "long-password-1"])
+
+        try await auth.sendPasswordReset(email: "a@b.co")
+        try await auth.sendPasswordReset(email: "a@b.co", redirectURL: "myapp://reset", continueURL: "https://myapp.example/done")
+        let forgot = StubURLProtocol.requests(to: "/v1/password/forgot").map(\.body)
+        XCTAssertEqual(forgot[0] as? [String: String], ["email": "a@b.co"])
+        XCTAssertEqual(forgot[1] as? [String: String], ["email": "a@b.co", "redirectUrl": "myapp://reset", "continueUrl": "https://myapp.example/done"])
+
+        try await auth.sendEmailVerification()
+        try await auth.sendEmailVerification(redirectURL: "myapp://verify")
+        try await auth.sendEmailVerification(continueURL: "https://myapp.example/done")
+        let verify = StubURLProtocol.requests(to: "/v1/email/send-verification")
+        XCTAssertEqual(verify.map { $0.body as? [String: String] }, [
+            [:],
+            ["redirectUrl": "myapp://verify"],
+            ["continueUrl": "https://myapp.example/done"],
+        ])
+        XCTAssertTrue(verify.allSatisfy { $0.headers["Authorization"] == "Bearer acc-2" })
+    }
+
     func testMethodsAndTelegram() async throws {
         StubURLProtocol.reset { r in
             switch r.path {
@@ -352,7 +429,7 @@ final class RiviumAuthTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(StubURLProtocol.requests.count, 2)
         for r in StubURLProtocol.requests {
-            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.4.0", r.path)
+            XCTAssertEqual(r.headers["X-Rivium-SDK"], "auth-ios/0.5.0", r.path)
         }
     }
 

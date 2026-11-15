@@ -51,6 +51,10 @@ public struct RiviumSignInOptions {
     /// Where the password reset link goes. nil: Rivium's own reset page.
     public var resetRedirectURL: String?
 
+    /// Where the "Continue" button of Rivium's own confirm and reset pages takes the user afterwards, for example
+    /// your website. One of the project's link addresses (Console › Rivium Auth › Settings). nil: no such button.
+    public var continueURL: String?
+
     /// Opens the Telegram bot link, for example `{ await UIApplication.shared.open($0) }`. Without it the screen
     /// shows the link for the user to copy.
     public var openURL: ((URL) async -> Void)?
@@ -65,6 +69,7 @@ public struct RiviumSignInOptions {
         magicLinkRedirectURL: String? = nil,
         verifyRedirectURL: String? = nil,
         resetRedirectURL: String? = nil,
+        continueURL: String? = nil,
         openURL: ((URL) async -> Void)? = nil
     ) {
         self.appName = appName
@@ -76,6 +81,7 @@ public struct RiviumSignInOptions {
         self.magicLinkRedirectURL = magicLinkRedirectURL
         self.verifyRedirectURL = verifyRedirectURL
         self.resetRedirectURL = resetRedirectURL
+        self.continueURL = continueURL
         self.openURL = openURL
     }
 }
