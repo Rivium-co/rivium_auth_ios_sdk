@@ -254,9 +254,9 @@ final class SignInUITests: XCTestCase {
         var opened: [URL] = []
         let (c, signedIn) = await screen(["telegram"], en { $0.openURL = { opened.append($0) } })
         c.go(.telegramPhone)
-        c.phone = "+98 (912) 345-6789"
+        c.phone = "+44 (7700) 900-123"
         await c.sendTelegramCode()?.value
-        XCTAssertEqual(bodies("/v1/telegram/code").first as? [String: String], ["phone": "+989123456789"])
+        XCTAssertEqual(bodies("/v1/telegram/code").first as? [String: String], ["phone": "+447700900123"])
         XCTAssertEqual(c.screen, .telegramPhone)
         XCTAssertEqual(c.safeBotURL?.absoluteString, "https://t.me/tikashop_bot")
         await c.openBot()?.value
@@ -272,7 +272,7 @@ final class SignInUITests: XCTestCase {
         c.code = "123456"
         await c.verifyTelegramCode()?.value
         XCTAssertEqual(signedIn().map(\.userId), ["u1"])
-        XCTAssertEqual(bodies("/v1/telegram/verify").last as? [String: String], ["phone": "+989123456789", "code": "123456"])
+        XCTAssertEqual(bodies("/v1/telegram/verify").last as? [String: String], ["phone": "+447700900123", "code": "123456"])
     }
 
     func testABotLinkThatIsNotHttpsTmeIsNeverShownOrOpened() async {
@@ -281,7 +281,7 @@ final class SignInUITests: XCTestCase {
             answers["/v1/telegram/code"] = { _ in .json(200, ["sent": false, "botUrl": link, "expiresIn": 0]) }
             let (c, _) = await screen(["telegram"], en { $0.openURL = { opened.append($0) } })
             c.go(.telegramPhone)
-            c.phone = "+989123456789"
+            c.phone = "+447700900123"
             await c.sendTelegramCode()?.value
             XCTAssertNil(c.safeBotURL, link)
             XCTAssertNil(c.openBot(), link)

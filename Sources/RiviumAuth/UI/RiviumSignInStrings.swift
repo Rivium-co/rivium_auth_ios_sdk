@@ -50,7 +50,7 @@ public struct RiviumSignInStrings: Equatable {
         "email": "E-mail",
         "password": "Password",
         "phone": "Phone number",
-        "phoneHint": "+98 912 345 6789",
+        "phoneHint": "+44 7700 900 123",
         "code": "Code",
         "signIn": "Sign in",
         "signUp": "Create account",
